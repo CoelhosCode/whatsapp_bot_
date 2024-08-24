@@ -20,12 +20,7 @@ conversa.selecionar_conversa()
 
 # Escrever a mensagem de Saudação
 escrever_mensagem = Conversa(driver)
-#escrever_mensagem.enviar_mensagem('''Olá, me chamo Beta, à assistente virtual da Rô.
-#Essas são algumas opções disponíveis para interação comigo.
-#1- Tabela de preços.
-#2- Agendamento de horários.
-#3- Falar diretamente com a Rô.
-#4- Finalizar Atendimento.''')
+
 escrever_mensagem.enviar_mensagem_inicial()
 # Leitura da opção da pessoa.
 while True:
