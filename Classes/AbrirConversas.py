@@ -3,7 +3,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
-from ConfigNavegador import Navegador
+from Classes.ConfigNavegador import Navegador
 from selenium.webdriver import ActionChains
 from time import sleep
 
@@ -15,7 +15,8 @@ class Conversa():
 
     def __init__(self, driver) -> None:
         self.driver = driver
-
+        self.mensagem_inicializada = True
+        self.numero_mensagens_anteriores = 0
     def selecionar_conversa(self):
 
         # Tempo de espera para que o elemento de NOTIFICACAO fique visível.
@@ -75,17 +76,35 @@ class Conversa():
             print("Não foi possível converter o texto da notificação em um número.")
             return False
         
-    def ler_mensagem(self):
-        # Tempo de espera para que a pessoa responda o bot.
-        WebDriverWait(self.driver, 30).until(
-            EC.presence_of_element_located((By.CLASS_NAME, '_akbu'))
-        )
+    def enviar_mensagem_inicial(self):
+        self.mensagem_inicial = "Olá, me chamo Beta, à assistente virtual da Rô.\nEssas são algumas opções disponíveis para interação comigo:\n1- Tabela de preços.\n2- Agendamento de horários.\n3- Falar diretamente com a Rô.\n4- Finalizar Atendimento."
+        self.enviar_mensagem(self.mensagem_inicial)
 
-        # Encontra a ultima mensagem.
-        self.ultimas_mensagens = self.driver.find_element(By.CLASS_NAME, '_akbu')
-        
-        # Loop para iterar com a última mensagem e pegar seu texto.
-        if self.ultimas_mensagens:
-            self.ultima_mensagem = self.ultimas_mensagens[0]
-            self.texto_ultima_mensagem = self.ultima_mensagem.find_element(By.CLASS_NAME, 'selectable-text').text
-            return self.texto_ultima_mensagem
+        self.numero_mensagens_anteriores = len(self.driver.find_elements(By.XPATH, 'message-in'))
+        self.mensagem_inicializada = True
+
+    def ler_mensagem(self):
+        try:
+
+            # Tempo de espera para que a pessoa responda o bot.
+            WebDriverWait(self.driver, 30).until(
+                EC.presence_of_element_located((By.CLASS_NAME, '_akbu'))
+            )
+
+            # Encontra a ultima mensagem.
+            self.ultimas_mensagens = self.driver.find_elements(By.CLASS_NAME, 'message-in')
+
+            mensagens_novas = self.ultimas_mensagens[self.numero_mensagens_anteriores:]
+
+                # Loop para iterar com a última mensagem e pegar seu texto.
+            if mensagens_novas:
+                self.ultima_mensagem = mensagens_novas[-1]
+                self.texto_ultima_mensagem = self.ultima_mensagem.find_element(By.CLASS_NAME, 'selectable-text').text
+                print(self.texto_ultima_mensagem)        
+                return self.texto_ultima_mensagem
+                
+            return None
+            
+        except TimeoutException:
+            print('Tempo limite de espera excedido')
+            return None
