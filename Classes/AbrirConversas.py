@@ -18,36 +18,39 @@ class Conversa():
         self.mensagem_inicializada = True
         self.numero_mensagens_anteriores = 0
     def selecionar_conversa(self):
-
-        # Tempo de espera para que o elemento de NOTIFICACAO fique visível.
-        self.notificacao_elemento = WebDriverWait(self.driver, 10).until(
-            EC.presence_of_all_elements_located((By.CLASS_NAME, Conversa.NOTIFICACAO))
-        )
-        # Encontra todas as conversas dentro do WhatsApp.
-        self.conversas = self.driver.find_elements(By.XPATH, Conversa.CONVERSAS)
-
-        # Um loop para iteração com todas as conversas para verificar se há notificações.
-        for conversas_com_notificacao in self.conversas:
+        while True:
             try:
-                # Procura se há notificações na conversa atual.
-                notificacao = conversas_com_notificacao.find_element(By.CLASS_NAME, Conversa.NOTIFICACAO)
-                self.numero_notificacoes = int(notificacao.text)
-            
-                print(f"Notificaçôes: {self.numero_notificacoes}")
-                
-                # Clica na conversa se houver notificações.
-                if self.numero_notificacoes > 0:
-                    conversas_com_notificacao.click()
-                    print('Conversa Selecionada.')
-                    return True
-            except ValueError:
-                print('Não foi possível converter o texto da notificação para número!')
-            except:
-                # Continua para a próxima conversa se não tiver notificações na conversa atual.
+                # Tempo de espera para que o elemento de NOTIFICACAO fique visível.
+                self.notificacao_elemento = WebDriverWait(self.driver, 60).until(
+                EC.presence_of_all_elements_located((By.CLASS_NAME, Conversa.NOTIFICACAO))
+                )
+            except TimeoutException:
                 continue
 
-        print('Não há notificações.')
-        return False
+            # Encontra todas as conversas dentro do WhatsApp.
+            self.conversas = self.driver.find_elements(By.XPATH, Conversa.CONVERSAS)
+
+            # Um loop para iteração com todas as conversas para verificar se há notificações.
+            for conversas_com_notificacao in self.conversas:
+                try:
+                    # Procura se há notificações na conversa atual.
+                    notificacao = conversas_com_notificacao.find_element(By.CLASS_NAME, Conversa.NOTIFICACAO)
+                    self.numero_notificacoes = int(notificacao.text)
+            
+                    print(f"Notificaçôes: {self.numero_notificacoes}")
+                
+                    # Clica na conversa se houver notificações.
+                    if self.numero_notificacoes > 0:
+                        conversas_com_notificacao.click()
+                        print('Conversa Selecionada.')
+                        break
+                except ValueError:
+                    print('Não foi possível converter o texto da notificação para número!')
+                except:
+                    # Continua para a próxima conversa se não tiver notificações na conversa atual.
+                    continue
+                print('Não há notificações.')
+            return False
     
     def enviar_mensagem(self, mensagem):
         try:
@@ -96,15 +99,16 @@ class Conversa():
 
             mensagens_novas = self.ultimas_mensagens[self.numero_mensagens_anteriores:]
 
-                # Loop para iterar com a última mensagem e pegar seu texto.
+            # Loop para iterar com a última mensagem e pegar seu texto.
             if mensagens_novas:
                 self.ultima_mensagem = mensagens_novas[-1]
                 self.texto_ultima_mensagem = self.ultima_mensagem.find_element(By.CLASS_NAME, 'selectable-text').text
-                print(self.texto_ultima_mensagem)        
-                return self.texto_ultima_mensagem
+                if self.texto_ultima_mensagem in ['1', '2', '3', '4']:
+                    return self.texto_ultima_mensagem
                 
-            return None
-            
         except TimeoutException:
             print('Tempo limite de espera excedido')
             return None
+        
+    def sair_conversa(self):
+        self.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.ESCAPE)
