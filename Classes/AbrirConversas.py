@@ -5,52 +5,50 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from Classes.ConfigNavegador import Navegador
 from selenium.webdriver import ActionChains
-from time import sleep
+import time
+import emoji
 
 class Conversa():
     # Xpath e Class_name utilizados para que o código funcione.
     NOTIFICACAO = "_ahlk"
     CONVERSAS = "//*[contains(@class, '_ak8l')]"
-    CAIXA_DE_TEXTO_MENSAGEM = "_ak1l"
+    CAIXA_DE_TEXTO_MENSAGEM = "_ak1q"
 
     def __init__(self, driver) -> None:
         self.driver = driver
+        self.estados_conversas = {}
         self.mensagem_inicializada = True
-        self.numero_mensagens_anteriores = 0
     def selecionar_conversa(self):
         while True:
+            time.sleep(3)
             try:
-                # Tempo de espera para que o elemento de NOTIFICACAO fique visível.
-                self.notificacao_elemento = WebDriverWait(self.driver, 60).until(
-                EC.presence_of_all_elements_located((By.CLASS_NAME, Conversa.NOTIFICACAO))
+                # Verificação para achar notificações
+                notificacoes = WebDriverWait(self.driver, 60).until(
+                    EC.presence_of_all_elements_located((By.CLASS_NAME,Conversa.NOTIFICACAO))
                 )
             except TimeoutException:
+                print("Nenhuma notificação encontrada. Retentando...")
                 continue
-
-            # Encontra todas as conversas dentro do WhatsApp.
-            self.conversas = self.driver.find_elements(By.XPATH, Conversa.CONVERSAS)
-
-            # Um loop para iteração com todas as conversas para verificar se há notificações.
-            for conversas_com_notificacao in self.conversas:
-                try:
-                    # Procura se há notificações na conversa atual.
-                    notificacao = conversas_com_notificacao.find_element(By.CLASS_NAME, Conversa.NOTIFICACAO)
-                    self.numero_notificacoes = int(notificacao.text)
             
-                    print(f"Notificaçôes: {self.numero_notificacoes}")
-                
-                    # Clica na conversa se houver notificações.
-                    if self.numero_notificacoes > 0:
-                        conversas_com_notificacao.click()
-                        print('Conversa Selecionada.')
-                        break
-                except ValueError:
-                    print('Não foi possível converter o texto da notificação para número!')
-                except:
-                    # Continua para a próxima conversa se não tiver notificações na conversa atual.
+            # Leitura do nome do contato selecionado
+            conversas = self.driver.find_elements(By.XPATH, Conversa.CONVERSAS)
+            for conversa in conversas:
+                try:
+                    contato = conversa.find_element(By.CLASS_NAME,'_ak8q').text
+
+                    # Se houver notificação, envia mensagem inicial
+                    notificacao = conversa.find_element(By.CLASS_NAME, Conversa.NOTIFICACAO)
+                    if int(notificacao.text) > 0:
+                        conversa.click()
+                        print(f"Conversa com {contato} selecionada.")
+                    
+                        if not self.estados_conversas.get(contato,  False):
+                            self.enviar_mensagem_inicial()
+                            self.estados_conversas[contato] = True
+                        return True
+                except Exception as e:
+                    print(f"Erro ao processar conversa: {e}")
                     continue
-                print('Não há notificações.')
-            return False
     
     def enviar_mensagem(self, mensagem):
         try:
@@ -68,8 +66,9 @@ class Conversa():
             print('Mensagem Escrita')
 
             # Envio da mensagem. Tempo de espera necessário para o bot não ser barrado pelo WhatsApp.
-            sleep(2)
-            self.caixa_de_mensagem.send_keys(Keys.ENTER)
+            time.sleep(2)
+            acao = ActionChains(self.driver)
+            acao.send_keys(Keys.ENTER).perform()
             print('Mensagem enviada')
 
         except TimeoutException:
@@ -78,37 +77,85 @@ class Conversa():
         except ValueError:
             print("Não foi possível converter o texto da notificação em um número.")
             return False
-        
+
+    #Função para enviar a mensagem inicial    
     def enviar_mensagem_inicial(self):
-        self.mensagem_inicial = "Olá, me chamo Beta, à assistente virtual da Rô.\nEssas são algumas opções disponíveis para interação comigo:\n1- Tabela de preços.\n2- Agendamento de horários.\n3- Falar diretamente com a Rô.\n4- Finalizar Atendimento."
+        remetente, texto_ultima_mensagem = self.ultima_mensagem()
+
+        if remetente == 'cliente' and texto_ultima_mensagem in ['1', '2', '3', '4']:
+            print('Continuando a conversa de acordo com o registro de mensagens.')
+            return
+        self.mensagem_inicial = (f"Olá, me chamo Beta, à assistente virtual da Rô.\nEssas são algumas opções disponíveis para interação comigo:\n1- {emoji.emojize(':etiqueta:')}Tabela de preços.\n2- {emoji.emojize(':relógio_temporizador:')}Agendamento de horários.\n3- {emoji.emojize(':telefone_celular:')}Falar diretamente com a Rô.\n4- {emoji.emojize(':coração_partido:')}Finalizar Atendimento."
+        )
         self.enviar_mensagem(self.mensagem_inicial)
 
-        self.numero_mensagens_anteriores = len(self.driver.find_elements(By.XPATH, 'message-in'))
+        mensagens_recebidas = self.driver.find_elements(By.CLASS_NAME, 'message-in')
+        self.numero_mensagens_anteriores = len(mensagens_recebidas)
         self.mensagem_inicializada = True
 
-    def ler_mensagem(self):
-        try:
+    #Função para obter mensagens da pessoa e do bot e armazena-las em listas diferentes
+    def obter_mensagens(self):
+        mensagens_cliente = self.driver.find_elements(By.CLASS_NAME, 'message-in')
+        mensagens_bot = self.driver.find_elements(By.CLASS_NAME, 'message-out')
+        return mensagens_cliente, mensagens_bot
+    
+    def ultima_mensagem(self):
+        mensagens_cliente, mensagens_bot = self.obter_mensagens()
 
-            # Tempo de espera para que a pessoa responda o bot.
-            WebDriverWait(self.driver, 30).until(
-                EC.presence_of_element_located((By.CLASS_NAME, '_akbu'))
-            )
+        #Pegará a ultima mensagem
+        ultima_mensagem_cliente = mensagens_cliente[-1] if mensagens_cliente else None
+        ultima_mensagem_bot = mensagens_bot[-1] if mensagens_bot else None
 
-            # Encontra a ultima mensagem.
-            self.ultimas_mensagens = self.driver.find_elements(By.CLASS_NAME, 'message-in')
-
-            mensagens_novas = self.ultimas_mensagens[self.numero_mensagens_anteriores:]
-
-            # Loop para iterar com a última mensagem e pegar seu texto.
-            if mensagens_novas:
-                self.ultima_mensagem = mensagens_novas[-1]
-                self.texto_ultima_mensagem = self.ultima_mensagem.find_element(By.CLASS_NAME, 'selectable-text').text
-                if self.texto_ultima_mensagem in ['1', '2', '3', '4']:
-                    return self.texto_ultima_mensagem
-                
-        except TimeoutException:
-            print('Tempo limite de espera excedido')
-            return None
+        #Verificação pra saber de quem foi a ultima mensagem
+        if ultima_mensagem_cliente and ultima_mensagem_bot:
+            if ultima_mensagem_cliente.location['y'] > ultima_mensagem_bot.location['y']:
+                texto = ultima_mensagem_cliente.find_element(By.CLASS_NAME, 'selectable-text').text
+                return "cliente", texto
+            else:
+                texto = ultima_mensagem_bot.find_element(By.CLASS_NAME, 'selectable-text').text
+                return "bot", texto
+        elif ultima_mensagem_cliente:
+            texto = ultima_mensagem_cliente.find_element(By.CLASS_NAME, 'selectable-text').text
+            return "cliente", texto
+        elif ultima_mensagem_bot:
+            texto = ultima_mensagem_bot.find_element(By.CLASS_NAME, 'selectable-text').text
+            return "bot", texto
         
+        return None, None
+    
+    #Função para aguarda a resposta do cliente
+    def aguardar_resposta(self, timeout = 10):
+        tempo_inicial = time.time()
+        while time.time() - tempo_inicial < timeout:
+            remetente, texto = self.ultima_mensagem()
+            if remetente == 'cliente':
+                return texto
+            time.sleep(5)
+        print("Tempo excedido para resposta. Saindo da conversa.")
+        self.sair_conversa()
+        return None
+
+    #Envio das opçoes disponíveis para interação com o bot
+    def opcoes_mensagem(self):
+        while True:
+            texto = self.aguardar_resposta(timeout=10)
+            if texto is None:
+                break
+            if texto == '1':
+                self.enviar_mensagem('Segue a tabela de preços:')
+            elif texto == '2':
+                self.enviar_mensagem('Segue o link para agendamento de horários.')
+            elif texto == '3':
+                self.enviar_mensagem('Link para falar com a Rô: https://tinyurl.com/RobertaFrancaDesigner')
+            elif texto == '4':
+                self.enviar_mensagem(
+                    f"Atendimento finalizado. Obrigado por confiar no trabalho da Rô! {emoji.emojize(':rosto_sorridente_com_3_corações:, :coração_vermelho:')} Nos vemos em breve."
+                )
+                self.sair_conversa()
+                break
+            else:
+                self.enviar_mensagem("Desculpe, não entendi. Por favor, escolha uma opção válida.")
+
+
     def sair_conversa(self):
         self.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.ESCAPE)
