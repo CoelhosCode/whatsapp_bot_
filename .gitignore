@@ -1,0 +1,38 @@
+# Arquivos gerados pelo sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos Python compilados
+*.py[cod]
+__pycache__/
+*.so
+
+# Ambientes virtuais
+.env/
+.venv/
+env/
+venv/
+
+# Configurações do editor de código/IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs e arquivos temporários
+*.log
+*.tmp
+*.out
+*.err
+
+# Arquivos de testes
+.tox/
+.coverage
+.cache/
+.nox/
+pytest_cache/
+htmlcov/
+
+# Ignorar diretórios pessoais
+config/
+settings/
+*.json

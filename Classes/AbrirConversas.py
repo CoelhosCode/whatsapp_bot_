@@ -3,7 +3,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
-from Classes.ConfigNavegador import Navegador
 from selenium.webdriver import ActionChains
 import time
 import emoji
@@ -82,11 +81,18 @@ class Conversa():
     def enviar_mensagem_inicial(self):
         remetente, texto_ultima_mensagem = self.ultima_mensagem()
 
-        if remetente == 'cliente' and texto_ultima_mensagem in ['1', '2', '3', '4']:
-            print('Continuando a conversa de acordo com o registro de mensagens.')
+        if remetente == 'cliente' and texto_ultima_mensagem is not None:
+            if texto_ultima_mensagem in ['1', '2', '3', '4']:
+                print('Continuando a conversa de acordo com o registro de mensagens.')
+                return
+        
+        elif texto_ultima_mensagem == "Sticker recebido" or "Mídia ou mensagem não reconhecida!" in texto_ultima_mensagem:
+            print("Cliente enviou uma mensagem não reconhecida pelo bot. Solicitando mensagem de texto")
+            self.enviar_mensagem("Desculpe, não compreendia sua mensagem. Por favor, envie uma mensagem de texto.")
             return
-        self.mensagem_inicial = (f"Olá, me chamo Beta, à assistente virtual da Rô.\nEssas são algumas opções disponíveis para interação comigo:\n1- {emoji.emojize(':etiqueta:')}Tabela de preços.\n2- {emoji.emojize(':relógio_temporizador:')}Agendamento de horários.\n3- {emoji.emojize(':telefone_celular:')}Falar diretamente com a Rô.\n4- {emoji.emojize(':coração_partido:')}Finalizar Atendimento."
-        )
+        
+        self.mensagem_inicial = "Olá, me chamo Beta, à assistente virtual da Rô.\nEssas são algumas opções disponíveis para interação comigo:\n 1- Tabela de preços. \n 2- Agendamento de horários.\n 3- Falar diretamente com a Rô.\n 4- Finalizar Atendimento. "
+        
         self.enviar_mensagem(self.mensagem_inicial)
 
         mensagens_recebidas = self.driver.find_elements(By.CLASS_NAME, 'message-in')
@@ -109,22 +115,36 @@ class Conversa():
         #Verificação pra saber de quem foi a ultima mensagem
         if ultima_mensagem_cliente and ultima_mensagem_bot:
             if ultima_mensagem_cliente.location['y'] > ultima_mensagem_bot.location['y']:
-                texto = ultima_mensagem_cliente.find_element(By.CLASS_NAME, 'selectable-text').text
-                return "cliente", texto
+                return self.verificar_tipo_mensagem(ultima_mensagem_cliente, "cliente")
             else:
-                texto = ultima_mensagem_bot.find_element(By.CLASS_NAME, 'selectable-text').text
-                return "bot", texto
+                return self.verificar_tipo_mensagem(ultima_mensagem_bot, "bot")
         elif ultima_mensagem_cliente:
-            texto = ultima_mensagem_cliente.find_element(By.CLASS_NAME, 'selectable-text').text
-            return "cliente", texto
+            return self.verificar_tipo_mensagem(ultima_mensagem_cliente, "cliente")
         elif ultima_mensagem_bot:
-            texto = ultima_mensagem_bot.find_element(By.CLASS_NAME, 'selectable-text').text
-            return "bot", texto
+            return self.verificar_tipo_mensagem(ultima_mensagem_bot, "bot")
         
         return None, None
     
+    def verificar_tipo_mensagem(self, mensagem, remetente):
+        try:
+            texto = mensagem.find_element(By.CLASS_NAME, 'selectable-text').text
+            return remetente, texto
+        except:
+        # Usa atributos para verificar o tipo de mensagem (sticker, vídeo, etc.)
+            atributos = mensagem.get_attribute("outerHTML")  # Pega todos os atributos como texto
+            if "sticker" in atributos:
+                return remetente, "Sticker recebido"
+            elif "video" in atributos:
+                return remetente, "Vídeo recebido"
+            elif "audio" in atributos:
+                return remetente, "Áudio recebido"
+            elif "image" in atributos:
+                return remetente, "Imagem recebida"
+            else:
+                return remetente, "Mídia ou mensagem não reconhecida!"
+            
     #Função para aguarda a resposta do cliente
-    def aguardar_resposta(self, timeout = 10):
+    def aguardar_resposta(self, timeout = 20):
         tempo_inicial = time.time()
         while time.time() - tempo_inicial < timeout:
             remetente, texto = self.ultima_mensagem()
@@ -143,19 +163,22 @@ class Conversa():
                 break
             if texto == '1':
                 self.enviar_mensagem('Segue a tabela de preços:')
+                self.enviar_mensagem("Essas são algumas opções disponíveis para interação comigo:\n 1- Tabela de preços. \n 2- Agendamento de horários.\n 3- Falar diretamente com a Rô.\n 4- Finalizar Atendimento.")
             elif texto == '2':
                 self.enviar_mensagem('Segue o link para agendamento de horários.')
+                self.enviar_mensagem("Essas são algumas opções disponíveis para interação comigo:\n 1- Tabela de preços. \n 2- Agendamento de horários.\n 3- Falar diretamente com a Rô.\n 4- Finalizar Atendimento.")
             elif texto == '3':
                 self.enviar_mensagem('Link para falar com a Rô: https://tinyurl.com/RobertaFrancaDesigner')
+                self.enviar_mensagem("Essas são algumas opções disponíveis para interação comigo:\n 1- Tabela de preços. \n 2- Agendamento de horários.\n 3- Falar diretamente com a Rô.\n 4- Finalizar Atendimento.")
             elif texto == '4':
-                self.enviar_mensagem(
-                    f"Atendimento finalizado. Obrigado por confiar no trabalho da Rô! {emoji.emojize(':rosto_sorridente_com_3_corações:, :coração_vermelho:')} Nos vemos em breve."
-                )
+                self.enviar_mensagem("Atendimento finalizado. Obrigado por confiar no trabalho da Rô! Nos vemos em breve. ")
                 self.sair_conversa()
                 break
+            elif texto is not None and (texto == "Sticker recebido" or "Mídia ou mensagem não reconhecida!" in texto):
+                self.enviar_mensagem("Desculpe, não compreendia sua mensagem. Por favor, envie uma mensagem de texto.")
             else:
                 self.enviar_mensagem("Desculpe, não entendi. Por favor, escolha uma opção válida.")
-
+                self.enviar_mensagem("Essas são algumas opções disponíveis para interação comigo:\n 1- Tabela de preços. \n 2- Agendamento de horários.\n 3- Falar diretamente com a Rô.\n 4- Finalizar Atendimento.")
 
     def sair_conversa(self):
         self.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.ESCAPE)

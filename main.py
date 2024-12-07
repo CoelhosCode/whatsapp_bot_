@@ -6,8 +6,7 @@ from time import sleep
 navegador = Navegador()
 driver = navegador.configuracao_navegador()
 
-# Tempo de espera para ler o QR CODE
-input('Pressione Enter após escanear o QR CODE!')
+sleep(5)
 
 while True:
     try:
